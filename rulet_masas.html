@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casino Rulet Masası</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #0d1117;
+            color: #fff;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        .casino-felt {
+            background-color: #0f5e33;
+            background-image: url('https://www.transparenttextures.com/patterns/felt.png');
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+        }
+
+        .casino-title {
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* --- RULET ÇARKI (YENİ) --- */
+        .wheel-wrapper {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 0 auto;
+            border-radius: 50%;
+            background: #452103; /* Dış ahşap çerçeve */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 5px 15px rgba(0,0,0,0.9);
+            border: 4px solid #b8860b;
+        }
+
+        /* Top Yolu */
+        #ball-container {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%;
+            z-index: 20;
+            /* JS ile döndürülecek */
+            transition: transform 5s cubic-bezier(0.2, 0.1, 0.1, 1);
+        }
+
+        .ball {
+            position: absolute;
+            top: 12px; /* Dış yörünge */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 14px;
+            height: 14px;
+            background: radial-gradient(circle at 30% 30%, #fff, #aaa);
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        /* İç Dönen Çark */
+        #wheel-inner {
+            position: absolute;
+            top: 24px; left: 24px; right: 24px; bottom: 24px;
+            border-radius: 50%;
+            /* JS ile döndürülecek */
+            transition: transform 5s cubic-bezier(0.2, 0.1, 0.1, 1);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border: 2px solid #daa520;
+            overflow: hidden;
+        }
+
+        /* Orta Kubbe */
+        .wheel-center {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 140px; height: 140px;
+            background: radial-gradient(circle, #b8860b 0%, #4a3402 100%);
+            border-radius: 50%;
+            z-index: 15;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.7), inset 0 2px 5px rgba(255,255,255,0.3);
+            border: 3px solid #ffd700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .wheel-center::after {
+            content: '';
+            width: 40px; height: 40px;
+            background: radial-gradient(circle, #e2e8f0 0%, #64748b 100%);
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* Çark Numaraları (Yuvalar) */
+        .pocket {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 24px; /* 360 / 37 açısına yaklaşık uygun genişlik */
+            height: 50%;
+            transform-origin: 50% 100%;
+            text-align: center;
+            padding-top: 4px;
+            margin-left: -12px; /* Genişliğin yarısı kadar geri al (Ortala) */
+        }
+        
+        .pocket span {
+            display: block;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        /* --- BAHİS MASASI --- */
+        .roulette-board {
+            display: grid;
+            grid-template-columns: 3rem repeat(12, 1fr) 4rem;
+            grid-template-rows: repeat(5, 3.5rem);
+            gap: 2px;
+            background-color: rgba(0,0,0,0.4);
+            border: 4px solid #b8860b;
+            border-radius: 8px;
+            padding: 4px;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        .bet-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+            position: relative;
+            border: 1px solid rgba(255,255,255,0.3);
+            transition: all 0.2s ease;
+        }
+
+        .bet-cell:hover { filter: brightness(1.3); border-color: #ffd700; }
+
+        .cell-red { background-color: #dc2626; }
+        .cell-black { background-color: #111827; }
+        .cell-green { background-color: #16a34a; }
+        .cell-empty { background-color: transparent; border-color: rgba(255,255,255,0.2); }
+
+        .cell-0 { grid-column: 1 / 2; grid-row: 1 / 4; border-top-left-radius: 4px; border-bottom-left-radius: 4px; font-size: 1.5rem; }
+        .cell-dozens { grid-column: span 4; font-size: 1.1rem; }
+        .cell-outside { grid-column: span 2; font-size: 1.1rem; }
+        .cell-col { grid-column: 14 / 15; font-size: 1rem; }
+
+        .row-4 { grid-row: 4 / 5; }
+        .row-5 { grid-row: 5 / 6; }
+
+        .chip {
+            position: absolute;
+            width: 26px; height: 26px;
+            background: repeating-linear-gradient(45deg, #1e3a8a, #1e3a8a 5px, #ffffff 5px, #ffffff 10px);
+            border: 3px solid #1e3a8a;
+            border-radius: 50%;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            display: none;
+            z-index: 10;
+        }
+        
+        .chip::after {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            background-color: #1e3a8a;
+            border-radius: 50%;
+            border: 1px dashed white;
+        }
+
+        .bet-cell.active .chip { display: block; animation: dropIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .bet-cell.active { border: 2px solid #ffd700; box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.5); }
+
+        @keyframes dropIn {
+            0% { transform: scale(3) translateY(-20px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .scrollable-board::-webkit-scrollbar { height: 8px; }
+        .scrollable-board::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+        .scrollable-board::-webkit-scrollbar-thumb { background: #b8860b; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 casino-felt">
+
+    <header class="w-full max-w-5xl mx-auto text-center py-2">
+        <h1 class="casino-title text-3xl md:text-4xl text-yellow-500 font-bold tracking-wider drop-shadow-lg">
+            <i class="fa-solid fa-crown text-yellow-400 mr-2"></i> Avrupa Ruleti
+        </h1>
+    </header>
+
+    <main class="w-full max-w-5xl mx-auto flex flex-col items-center gap-6 flex-grow justify-center">
+        
+        <!-- YENİ: Gerçekçi Görsel Rulet Çarkı -->
+        <div class="flex flex-col items-center gap-2">
+            <div class="wheel-wrapper">
+                <!-- Çark Zemin ve Yuvalar -->
+                <div id="wheel-inner">
+                    <!-- JS ile yuvalar ve arka plan renkleri eklenecek -->
+                </div>
+                <!-- Çark Merkezi -->
+                <div class="wheel-center"></div>
+                <!-- Top ve Yörüngesi -->
+                <div id="ball-container">
+                    <div class="ball"></div>
+                </div>
+            </div>
+
+            <!-- Sonuç Bildirim Ekranı -->
+            <div id="result-message" class="h-10 mt-2 text-2xl font-bold tracking-wide transition-all duration-300 text-gray-200">
+                Lütfen bahislerinizi yapın.
+            </div>
+        </div>
+
+        <!-- Bahis Masası -->
+        <div class="w-full overflow-x-auto scrollable-board pb-4 flex justify-center">
+            <div class="roulette-board w-max" id="board">
+                <div class="bet-cell cell-green cell-0" data-bet="0">0<div class="chip"></div></div>
+                
+                <!-- JS ile 1-36 Rakamları Gelecek -->
+
+                <div class="bet-cell cell-empty cell-col" style="grid-row: 1;" data-bet="col3">2:1<div class="chip"></div></div>
+                <div class="bet-cell cell-empty cell-col" style="grid-row: 2;" data-bet="col2">2:1<div class="chip"></div></div>
+                <div class="bet-cell cell-empty cell-col" style="grid-row: 3;" data-bet="col1">2:1<div class="chip"></div></div>
+
+                <div class="bet-cell cell-empty cell-dozens row-4" style="grid-column: 2 / span 4;" data-bet="1st12">1st 12<div class="chip"></div></div>
+                <div class="bet-cell cell-empty cell-dozens row-4" style="grid-column: 6 / span 4;" data-bet="2nd12">2nd 12<div class="chip"></div></div>
+                <div class="bet-cell cell-empty cell-dozens row-4" style="grid-column: 10 / span 4;" data-bet="3rd12">3rd 12<div class="chip"></div></div>
+
+                <div class="bet-cell cell-empty cell-outside row-5" style="grid-column: 2 / span 2;" data-bet="1-18">1 to 18<div class="chip"></div></div>
+                <div class="bet-cell cell-empty cell-outside row-5" style="grid-column: 4 / span 2;" data-bet="even">EVEN<div class="chip"></div></div>
+                <div class="bet-cell cell-red cell-outside row-5" style="grid-column: 6 / span 2;" data-bet="red">RED<div class="chip"></div></div>
+                <div class="bet-cell cell-black cell-outside row-5" style="grid-column: 8 / span 2;" data-bet="black">BLACK<div class="chip"></div></div>
+                <div class="bet-cell cell-empty cell-outside row-5" style="grid-column: 10 / span 2;" data-bet="odd">ODD<div class="chip"></div></div>
+                <div class="bet-cell cell-empty cell-outside row-5" style="grid-column: 12 / span 2;" data-bet="19-36">19 to 36<div class="chip"></div></div>
+            </div>
+        </div>
+
+        <!-- Kontroller -->
+        <div class="w-full flex flex-col md:flex-row items-center justify-between gap-4 bg-black/40 p-4 rounded-xl border border-yellow-600/30 shadow-xl backdrop-blur-sm">
+            <div class="text-sm font-medium text-gray-300">
+                Seçilen Bahis: <span id="bet-count" class="text-yellow-400 font-bold text-lg">0</span>
+            </div>
+            <div class="flex gap-4 w-full md:w-auto">
+                <button id="clear-btn" class="flex-1 md:flex-none px-6 py-3 rounded-lg bg-red-900 hover:bg-red-800 text-white font-bold border border-red-700 transition-colors shadow-lg active:scale-95">
+                    <i class="fa-solid fa-trash-can mr-2"></i> Temizle
+                </button>
+                <button id="spin-btn" class="flex-1 md:flex-none px-12 py-3 rounded-lg bg-gradient-to-b from-yellow-400 to-yellow-600 hover:from-yellow-300 hover:to-yellow-500 text-black font-extrabold text-xl border-2 border-yellow-200 transition-all shadow-[0_0_20px_rgba(250,204,21,0.5)] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                    ÇEVİR <i class="fa-solid fa-rotate-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+        // Avrupa Ruleti tam dizilimi
+        const wheelSequence = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+        
+        const activeBets = new Set();
+        let isSpinning = false;
+        
+        // Animasyon için dönüş dereceleri (Sürekli artması/azalması için tutulur)
+        let currentWheelRot = 0; 
+        let currentBallRot = 0;
+
+        const boardElement = document.getElementById('board');
+        const betCountElement = document.getElementById('bet-count');
+        const clearBtn = document.getElementById('clear-btn');
+        const spinBtn = document.getElementById('spin-btn');
+        const resultMessage = document.getElementById('result-message');
+        const wheelInner = document.getElementById('wheel-inner');
+        const ballContainer = document.getElementById('ball-container');
+
+        // 1. Çarkı Çizme (CSS Conic Gradient & HTML Yuvalar)
+        const setupWheel = () => {
+            const wedgeAngle = 360 / 37;
+            let gradientParts = [];
+
+            wheelSequence.forEach((num, index) => {
+                // Rengi belirle
+                let color = '#16a34a'; // 0 = Yeşil
+                if (num !== 0) {
+                    color = redNumbers.includes(num) ? '#dc2626' : '#111827';
+                }
+                
+                // Conic Gradient için dilimleri oluştur (Her dilim merkeze otursun diye açıyı yarım dilim geriden başlatıyoruz)
+                let startAngle = (index * wedgeAngle) - (wedgeAngle / 2);
+                let endAngle = startAngle + wedgeAngle;
+                gradientParts.push(`${color} ${startAngle}deg ${endAngle}deg`);
+
+                // Sayı elementini oluştur ve döndür
+                const pocket = document.createElement('div');
+                pocket.className = 'pocket';
+                // index * wedgeAngle tam olarak dilimin ortasıdır.
+                pocket.style.transform = `rotate(${index * wedgeAngle}deg)`;
+                pocket.innerHTML = `<span>${num}</span>`;
+                wheelInner.appendChild(pocket);
+            });
+
+            // Tek seferde tüm çark arkaplanını CSS gradient ile boya
+            wheelInner.style.background = `conic-gradient(from 0deg, ${gradientParts.join(', ')})`;
+        };
+
+        // 2. Bahis Tahtasını Oluştur (1-36 Grid)
+        const generateBoardNumbers = () => {
+            const layout = [
+                [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36],
+                [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],
+                [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34]
+            ];
+            const colBets = document.querySelectorAll('.cell-col');
+            const insertReference = colBets[0];
+
+            layout.forEach((row, rowIndex) => {
+                row.forEach((num, colIndex) => {
+                    const div = document.createElement('div');
+                    const isRed = redNumbers.includes(num);
+                    div.className = `bet-cell ${isRed ? 'cell-red' : 'cell-black'}`;
+                    div.style.gridRow = (rowIndex + 1).toString();
+                    div.style.gridColumn = (colIndex + 2).toString();
+                    div.dataset.bet = num.toString();
+                    div.innerHTML = `${num}<div class="chip"></div>`;
+                    boardElement.insertBefore(div, insertReference);
+                });
+            });
+        };
+
+        const toggleBet = (element) => {
+            if (isSpinning) return;
+            const betType = element.dataset.bet;
+            if (activeBets.has(betType)) {
+                activeBets.delete(betType);
+                element.classList.remove('active');
+            } else {
+                activeBets.add(betType);
+                element.classList.add('active');
+            }
+            updateUI();
+        };
+
+        const updateUI = () => {
+            betCountElement.textContent = activeBets.size;
+            spinBtn.disabled = activeBets.size === 0;
+            if (activeBets.size === 0 && !isSpinning) {
+                resultMessage.innerHTML = "Lütfen bahislerinizi yapın.";
+                resultMessage.className = "h-10 mt-2 text-2xl font-bold tracking-wide text-gray-200";
+            }
+        };
+
+        const clearBoard = () => {
+            if (isSpinning) return;
+            activeBets.clear();
+            document.querySelectorAll('.bet-cell').forEach(cell => {
+                cell.classList.remove('active', 'ring-4', 'ring-green-400', 'ring-red-500', 'z-20');
+            });
+            resultMessage.innerHTML = "Bahisler temizlendi.";
+            resultMessage.className = "h-10 mt-2 text-2xl font-bold tracking-wide text-gray-400";
+            updateUI();
+        };
+
+        const checkWin = (bet, winningNumber) => {
+            if (bet === winningNumber.toString()) return true;
+            if (bet === 'red') return redNumbers.includes(winningNumber);
+            if (bet === 'black') return !redNumbers.includes(winningNumber) && winningNumber !== 0;
+            if (bet === 'even') return winningNumber !== 0 && winningNumber % 2 === 0;
+            if (bet === 'odd') return winningNumber !== 0 && winningNumber % 2 !== 0;
+            if (bet === '1-18') return winningNumber >= 1 && winningNumber <= 18;
+            if (bet === '19-36') return winningNumber >= 19 && winningNumber <= 36;
+            if (bet === '1st12') return winningNumber >= 1 && winningNumber <= 12;
+            if (bet === '2nd12') return winningNumber >= 13 && winningNumber <= 24;
+            if (bet === '3rd12') return winningNumber >= 25 && winningNumber <= 36;
+            if (bet === 'col1') return winningNumber !== 0 && winningNumber % 3 === 1;
+            if (bet === 'col2') return winningNumber !== 0 && winningNumber % 3 === 2;
+            if (bet === 'col3') return winningNumber !== 0 && winningNumber % 3 === 0;
+            return false;
+        };
+
+        // 3. Gerçekçi Animasyon ve Matematik (Çark Dönüşü)
+        const spinWheel = () => {
+            if (activeBets.size === 0 || isSpinning) return;
+            isSpinning = true;
+            spinBtn.disabled = true;
+            clearBtn.disabled = true;
+
+            resultMessage.innerHTML = "<span class='text-yellow-400 animate-pulse'>Bahisler kapandı, dönüyor...</span>";
+            document.querySelectorAll('.bet-cell').forEach(cell => {
+                cell.classList.remove('ring-4', 'ring-green-400', 'ring-red-500', 'z-20');
+            });
+
+            // Rastgele kazanan sayıyı belirle (0-36)
+            const winningNumber = wheelSequence[Math.floor(Math.random() * 37)];
+            const targetIndex = wheelSequence.indexOf(winningNumber);
+            
+            // Çark için yeni dönüş derecesi (Saat yönünde ekstra 3-4 tam tur + rastgele açı)
+            const extraWheelSpins = (4 * 360) + Math.floor(Math.random() * 360);
+            const targetWheelRot = currentWheelRot + extraWheelSpins;
+            
+            // Seçilen sayının çark üzerindeki O ANKİ BAZ AÇISI (Çark 0 derecedeyken konumu)
+            const basePocketAngle = targetIndex * (360 / 37);
+            
+            // Çarkın son durumda ekranda duracağı kesin mutlak açı (Çarkın kendi dönüşü + cebin kendi açısı)
+            const finalAbsoluteAngle = basePocketAngle + targetWheelRot;
+            
+            // Top çarkın tersi yönünde (Saat yönünün tersi - Eksi değerlere doğru) dönecek
+            // Topun son duracağı nokta tam olarak `finalAbsoluteAngle` olmalı.
+            let targetBallRot = finalAbsoluteAngle % 360; 
+            
+            // Topun mevcut konumundan geriye doğru (eksiye) gitmesini ve en az 5 tam tur atmasını sağlıyoruz.
+            while (targetBallRot > currentBallRot - (360 * 5)) {
+                targetBallRot -= 360;
+            }
+
+            // Değerleri kaydet
+            currentWheelRot = targetWheelRot;
+            currentBallRot = targetBallRot;
+
+            // CSS Animasyonunu tetikle
+            wheelInner.style.transform = `rotate(${currentWheelRot}deg)`;
+            ballContainer.style.transform = `rotate(${currentBallRot}deg)`;
+
+            // Animasyon süresi 5 saniye + 100ms gecikme
+            setTimeout(() => {
+                isSpinning = false;
+                clearBtn.disabled = false;
+                spinBtn.disabled = false;
+
+                // Sonucu Kontrol Et
+                let wonBets = [];
+                activeBets.forEach(bet => {
+                    if (checkWin(bet, winningNumber)) wonBets.push(bet);
+                });
+
+                const isRed = redNumbers.includes(winningNumber);
+                const colorName = winningNumber === 0 ? 'Yeşil' : (isRed ? 'Kırmızı' : 'Siyah');
+                const textColor = winningNumber === 0 ? 'text-green-500' : (isRed ? 'text-red-500' : 'text-gray-300');
+
+                if (wonBets.length > 0) {
+                    resultMessage.innerHTML = `<span class='${textColor} drop-shadow-md'><i class="fa-solid fa-champagne-glasses mr-2"></i> ${winningNumber} ${colorName} KAZANDIRDI!</span>`;
+                    wonBets.forEach(bet => {
+                        const cell = document.querySelector(`.bet-cell[data-bet="${bet}"]`);
+                        if(cell) cell.classList.add('ring-4', 'ring-green-400', 'z-20');
+                    });
+                } else {
+                    resultMessage.innerHTML = `<span class='${textColor} drop-shadow-md'>Sonuç: ${winningNumber} ${colorName}. Kaybettin.</span>`;
+                    activeBets.forEach(bet => {
+                        const cell = document.querySelector(`.bet-cell[data-bet="${bet}"]`);
+                        if(cell) cell.classList.add('ring-4', 'ring-red-500', 'z-20');
+                    });
+                }
+
+            }, 5100);
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupWheel();
+            generateBoardNumbers();
+            
+            boardElement.addEventListener('click', (e) => {
+                const cell = e.target.closest('.bet-cell');
+                if (cell) toggleBet(cell);
+            });
+
+            clearBtn.addEventListener('click', clearBoard);
+            spinBtn.addEventListener('click', spinWheel);
+            
+            updateUI();
+        });
+    </script>
+</body>
+</html>
